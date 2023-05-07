@@ -1,0 +1,52 @@
+!pip install fredapi
+
+import numpy as np
+import pandas as pd
+from fredapi import Fred
+
+api_key = '7d6c81a3acb267d0545071b60cc05194' # Replace with your FRED API key
+fred = Fred(api_key=api_key)
+
+# Fetch historical data
+data = pd.DataFrame(fred.get_series('SP500', '2020-01-01', '2020-12-31'))
+data.columns = ['Close']
+
+# Generate synthetic bid-ask spread data
+np.random.seed(42)
+data['Bid'] = data['Close'] - np.random.uniform(0.5, 1.5, len(data))
+data['Ask'] = data['Close'] + np.random.uniform(0.5, 1.5, len(data))
+
+# Define market making function
+def market_making(data, spread_threshold=0.05):
+    inventory = 0
+    cash = 0
+    trades = []
+
+    for index, row in data.iterrows():
+        mid_price = (row['Bid'] + row['Ask']) / 2
+        spread = row['Ask'] - row['Bid']
+
+        if spread > spread_threshold:
+            # Buy at bid price
+            inventory += 1
+            cash -= row['Bid']
+            trades.append(('Buy', index, row['Bid'], inventory, cash))
+
+            # Sell at ask price
+            inventory -= 1
+            cash += row['Ask']
+            trades.append(('Sell', index, row['Ask'], inventory, cash))
+
+    return trades
+
+# Run the market making strategy
+trades = market_making(data)
+
+# Print the trades
+print("Trades:")
+for trade in trades:
+    print(f"{trade[0]} at {trade[1]} for ${trade[2]:.2f}, Inventory: {trade[3]}, Cash: ${trade[4]:.2f}")
+
+# Calculate the PnL
+pnl = trades[-1][-1] - trades[0][-1]
+print(f"\nProfit & Loss: ${pnl:.2f}")
